@@ -1,28 +1,29 @@
 import gym
 import copy
 
+from stable_baselines.common.atari_wrappers import LazyFrames
 import numpy as np
+from collections import deque
 
 from gym import spaces
 from environment.server import Server
 
-
 class NetwEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, num_of_data=8, num_of_target=3, num_of_user =24, action_method='ChooseTier', serverPort=5555):
+    def __init__(self, k=4, num_of_data=8, num_of_target=3, num_of_user =24, action_method='ChooseTier', serverPort=5555):
         self.server = Server(serverPort, 5, num_of_data)
-    
+        self.k = k
         self.num_of_data = num_of_data
         self.current_target = np.zeros(self.num_of_data)
         self.action_method = action_method
         self.num_of_target = num_of_target
         self.num_of_user = num_of_user
-
+        self.frames = np.zeros((k, self.num_of_data, 4), dtype=np.float32)
         self.action_space = spaces.Box(low = -1, high=1, shape=(self.num_of_data* 3,), dtype=np.float32)
         #temp = np.ones((self.num_of_data,))*self.num_of_targeddt
         #self.action_space = spaces.MultiDiscrete(temp)
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(self.num_of_data, 4), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(k, self.num_of_data, 4), dtype=np.float32)
 
     def step(self, action: np.ndarray):
         action = action.reshape(self.num_of_data, 3)
@@ -43,9 +44,9 @@ class NetwEnv(gym.Env):
         for i in range(self.num_of_data):
             self.current_target[i] = obs[i][1];
         info = {"None": 1}
-        
-
-        return obs_x, reward, done, info
+        self.frames[-1] = obs_x
+        self.frames = np.roll(self.frames, 1, axis=0)
+        return self.frames, reward, done, info
 
     def reset(self):
         while True:
@@ -61,8 +62,9 @@ class NetwEnv(gym.Env):
             obs_x[i][1] = obs[i][1] / self.num_of_target
             obs_x[i][2] = (obs[i][2] - obs[i][3])/1000000
             obs_x[i][3] = (obs[i][5] - obs[i][4])/10000000
-
-        return obs_x
+        for i in range(self.k):
+            self.frames[i] = obs_x
+        return self.frames
 
     def render(self, mode='human'):
         pass
