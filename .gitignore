@@ -1,2 +1,6 @@
 # log
 log/
+# model
+model/
+# __pycache__
+__pycache__/
